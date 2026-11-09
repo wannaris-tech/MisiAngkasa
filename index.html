@@ -148,6 +148,11 @@
                     </button>
                 </div>
 
+                <!-- Butang Lencana Tambahan -->
+                <button onclick="showBadgesMenu()" id="btn-lencana" class="w-full py-3 mb-5 rounded-2xl bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-white font-heading text-xl shadow-lg transform transition hover:scale-105 border-b-4 border-yellow-800">
+                    Koleksi Lencana 🏆
+                </button>
+
                 <!-- Copyright Text -->
                 <div class="mt-2 pt-4 border-t border-white/20">
                     <p class="text-[10px] md:text-xs text-gray-400 leading-relaxed font-sans">
@@ -248,6 +253,43 @@
             </div>
         </div>
 
+        <!-- BADGES SCREEN / MENU LENCANA -->
+        <div id="badges-screen" class="hidden absolute inset-0 flex items-center justify-center pointer-events-auto bg-black/80 backdrop-blur-md z-[60]">
+            <div class="glass-panel p-6 md:p-8 rounded-3xl max-w-2xl w-full mx-4 text-center animate-pop max-h-[90vh] overflow-y-auto custom-scrollbar">
+                <h2 class="text-3xl md:text-4xl font-heading text-yellow-400 mb-6 drop-shadow-lg">Koleksi Lencana</h2>
+                
+                <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6" id="badges-container">
+                    <!-- Lencana akan dijana oleh JavaScript -->
+                </div>
+
+                <div class="flex flex-col sm:flex-row gap-3 justify-center">
+                    <button onclick="hideBadgesMenu()" class="px-8 py-3 rounded-full bg-blue-500 hover:bg-blue-600 text-white font-heading text-xl shadow-lg border-b-4 border-blue-700 hover:scale-105 transition">
+                        Kembali
+                    </button>
+                    <button onclick="confirmResetBadges()" class="px-8 py-3 rounded-full bg-red-500 hover:bg-red-600 text-white font-heading text-xl shadow-lg border-b-4 border-red-700 hover:scale-105 transition">
+                        Reset Lencana 🗑️
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- RESET CONFIRMATION SCREEN (PENGESAHAN RESET) -->
+        <div id="reset-confirm-screen" class="hidden absolute inset-0 flex items-center justify-center pointer-events-auto bg-black/90 backdrop-blur-md z-[70]">
+            <div class="glass-panel p-8 md:p-10 rounded-3xl max-w-md w-full mx-4 text-center animate-pop">
+                <h2 class="text-3xl md:text-4xl font-heading text-red-500 mb-4">Padam Semua?</h2>
+                <p class="text-lg md:text-xl text-white font-sans mb-8">Adakah anda pasti mahu memadam semua lencana yang telah dikumpul? Lencana akan hilang sepenuhnya.</p>
+                
+                <div class="flex flex-col gap-4">
+                    <button onclick="executeResetBadges()" class="w-full py-3 rounded-full bg-red-500 hover:bg-red-600 text-white font-heading text-xl shadow-lg border-b-4 border-red-700 hover:scale-105 transition">
+                        Ya, Padam Semua
+                    </button>
+                    <button onclick="cancelResetBadges()" class="w-full py-3 rounded-full bg-gray-500 hover:bg-gray-600 text-white font-heading text-xl shadow-lg border-b-4 border-gray-700 hover:scale-105 transition">
+                        Batal
+                    </button>
+                </div>
+            </div>
+        </div>
+
     </div>
 
     <script>
@@ -268,6 +310,20 @@
         let currentAnswer = 0;
         let isMusicPlaying = true;
         let isFirstTryCorrect = true; // Penanda jika berjaya jawab pada cubaan pertama
+        let lastQuestionText = ""; // Penanda soalan terakhir untuk elakkan ulangan
+
+        // --- SISTEM LENCANA (BADGES) ---
+        const badgeData = [
+            { id: 't1', name: 'Angkasawan Roket Muda', icon: '👨‍🚀' },
+            { id: 't2', name: 'Wira Roket Bijak', icon: '🛸' },
+            { id: 't3', name: 'Kapten Roket Angkasa', icon: '👑' },
+            { id: 't4_1', name: 'Misi 1: Bintang Bijak', icon: '🌟' },
+            { id: 't4_2', name: 'Misi 2: Cabaran Meteor', icon: '☄️' },
+            { id: 't4_3', name: 'Misi 3: Rahsia Planet', icon: '🪐' },
+            { id: 't4_4', name: 'Misi 4: Komander', icon: '🚀' }
+        ];
+        // Tarik rekod lencana lama jika pemain pernah bermain sebelum ini
+        let userBadges = JSON.parse(localStorage.getItem('MisiAngkasa_Badges')) || [];
 
         // --- THREE.JS VARIABLES ---
         let scene, camera, renderer;
@@ -512,7 +568,7 @@
             const jointM = new THREE.MeshStandardMaterial({color: 0x64748b, roughness: 0.7});
             
             const glass = new THREE.Mesh(new THREE.SphereGeometry(0.65, 32, 32), new THREE.MeshPhysicalMaterial({
-                color: 0x88ccff, transmission: 0.6, opacity: 1.0, transparent: true, roughness: 0.05, metalness: 0.2
+                color: 0x333333, transmission: 0.6, opacity: 1.0, transparent: true, roughness: 0.05, metalness: 0.2
             })); glass.position.set(0, 0.15, 0.12);
             
             const head = new THREE.Mesh(new THREE.SphereGeometry(0.75, 32, 32), suitM);
@@ -560,6 +616,7 @@
         // --- UI MENUS ---
         function showLevel4Menu() {
             document.getElementById('main-levels').classList.add('hidden');
+            document.getElementById('btn-lencana').classList.add('hidden');
             document.getElementById('level4-missions').classList.remove('hidden');
             document.getElementById('menu-desc').innerText = "Pilih Misi Komander untuk menguji kemahiran lanjutan anda!";
         }
@@ -567,126 +624,204 @@
         function hideLevel4Menu() {
             document.getElementById('level4-missions').classList.add('hidden');
             document.getElementById('main-levels').classList.remove('hidden');
+            document.getElementById('btn-lencana').classList.remove('hidden');
             document.getElementById('menu-desc').innerText = "Selesaikan soalan Matematik dengan menangkap jawapan bintang yang betul!";
+        }
+
+        function showBadgesMenu() {
+            const container = document.getElementById('badges-container');
+            container.innerHTML = '';
+            
+            badgeData.forEach(b => {
+                const hasBadge = userBadges.includes(b.id);
+                // Jika ada lencana warnakan cerah, jika tiada jadikan pudar (kelabu)
+                const opacityClass = hasBadge ? 'opacity-100' : 'opacity-40 grayscale';
+                const bgClass = hasBadge ? 'bg-gradient-to-b from-yellow-500/20 to-yellow-700/40 border-yellow-500/50' : 'bg-white/5 border-white/10';
+                const textClass = hasBadge ? 'text-yellow-300' : 'text-gray-400';
+                const statusText = hasBadge ? '<div class="text-[10px] text-green-400 mt-2 uppercase font-bold bg-green-900/40 px-2 py-1 rounded-full">Dimiliki</div>' : '<div class="text-[10px] text-gray-400 mt-2 uppercase font-bold bg-gray-800/60 px-2 py-1 rounded-full">Terkunci</div>';
+                
+                container.innerHTML += `
+                    <div class="flex flex-col items-center justify-between p-3 md:p-4 rounded-2xl border-2 ${bgClass} ${opacityClass} transition-all">
+                        <div class="text-4xl md:text-5xl mb-2 drop-shadow-md">${b.icon}</div>
+                        <div class="text-xs md:text-sm font-heading ${textClass} leading-tight">${b.name}</div>
+                        ${statusText}
+                    </div>
+                `;
+            });
+
+            document.getElementById('menu-screen').classList.add('hidden');
+            document.getElementById('badges-screen').classList.remove('hidden');
+        }
+
+        function hideBadgesMenu() {
+            document.getElementById('badges-screen').classList.add('hidden');
+            document.getElementById('menu-screen').classList.remove('hidden');
+        }
+
+        // --- FUNGSI RESET LENCANA ---
+        function confirmResetBadges() {
+            playSound('pop');
+            document.getElementById('reset-confirm-screen').classList.remove('hidden');
+        }
+
+        function cancelResetBadges() {
+            playSound('pop');
+            document.getElementById('reset-confirm-screen').classList.add('hidden');
+        }
+
+        function executeResetBadges() {
+            playSound('pop');
+            userBadges = []; // Kosongkan senarai lencana
+            localStorage.removeItem('MisiAngkasa_Badges'); // Buang data simpanan tempatan
+            document.getElementById('reset-confirm-screen').classList.add('hidden');
+            showBadgesMenu(); // Segar semula paparan menu lencana supaya kembali "Terkunci"
         }
 
         // --- MATH QUESTION GENERATOR ---
         function generateMathLogic() {
             let qText = "", correct = 0, wrong1 = 0, wrong2 = 0, starCount = 3;
+            let attempts = 0;
 
-            if (currentLevel === 1) {
-                // TAHAP 1: Persediaan Prasekolah (Tiada objek dikira, fokus konsep nilai & asas)
-                const type = Math.floor(Math.random() * 3);
-                starCount = 2; // Tahap 1 sentiasa 2 pilihan
-                
-                if (type === 0) {
-                    let a = Math.floor(Math.random() * 5) + 1;
-                    correct = a + Math.floor(Math.random() * 3) + 1;
-                    qText = `Nombor yang lebih\nbesar daripada ${a}?`;
-                    wrong1 = Math.max(0, a - 1);
-                } else if (type === 1) {
-                    let start = Math.floor(Math.random() * 5) + 1;
-                    correct = start + 2;
-                    qText = `Lengkapkan:\n${start}, ${start+1}, _ , ${start+3}`;
-                    wrong1 = correct + 1;
-                } else {
-                    let a = Math.floor(Math.random() * 4) + 1;
-                    let b = Math.floor(Math.random() * 3) + 1;
-                    correct = a + b;
-                    qText = `${a} + ${b} = ?`;
-                    wrong1 = correct + 1;
-                }
-                
-            } else if (currentLevel === 2) {
-                // TAHAP 2: Prasekolah - Tahun 1
-                const type = Math.floor(Math.random() * 3);
-                if (type === 0) {
-                    let a = Math.floor(Math.random() * 8) + 2;
-                    let b = Math.floor(Math.random() * 6) + 1;
-                    correct = a + b;
-                    qText = `${a} + ${b} = ?`;
-                } else if (type === 1) {
-                    let a = Math.floor(Math.random() * 10) + 5;
-                    let b = Math.floor(Math.random() * (a - 1)) + 1;
-                    correct = a - b;
-                    qText = `${a} - ${b} = ?`;
-                } else {
-                    let a = Math.floor(Math.random() * 6) + 2;
-                    correct = Math.floor(Math.random() * 5) + 2;
-                    let sum = a + correct;
-                    qText = `${a} + _ = ${sum}`;
-                }
-                wrong1 = correct + 1; wrong2 = Math.max(0, correct - 1);
-
-            } else if (currentLevel === 3) {
-                // TAHAP 3: Tahun 1 (Penyelesaian Masalah Ringkas)
-                const type = Math.floor(Math.random() * 3);
-                if (type === 0) {
-                    let a = Math.floor(Math.random() * 9) + 5;
-                    let b = Math.floor(Math.random() * 6) + 3;
-                    correct = a + b;
-                    qText = `Ali ada ${a} bintang.\nDapat ${b} lagi.\nJumlah?`;
-                } else if (type === 1) {
-                    let a = Math.floor(Math.random() * 10) + 10;
-                    let b = Math.floor(Math.random() * 7) + 2;
-                    correct = a - b;
-                    qText = `Roket ada ${a} tenaga.\nGuna ${b}.\nBaki tenaga?`;
-                } else {
-                    let a = Math.floor(Math.random() * 15) + 5;
-                    let b = Math.floor(Math.random() * 8) + 4;
-                    correct = a + b;
-                    qText = `${a} + ${b} = ?`;
-                }
-                wrong1 = correct + 2; wrong2 = Math.max(1, correct - 1);
-                
-            } else {
-                // TAHAP 4: Tahun 1 Lanjutan (Pecahan kepada 4 Misi)
-                let activeMission = currentMission;
-                if (activeMission === 4) activeMission = Math.floor(Math.random() * 3) + 1; // Misi 4 campur Misi 1,2,3
-
-                if (activeMission === 1) {
-                    // Misi 1: Bintang Bijak (Tambah tolak & missing numbers)
-                    if (Math.random() < 0.5) {
-                        let a = Math.floor(Math.random() * 15) + 10;
-                        let b = Math.floor(Math.random() * 10) + 5;
+            do {
+                if (currentLevel === 1) {
+                    // TAHAP 1: Persediaan Prasekolah (Kiraan objek angkasa & asas nilai)
+                    const type = Math.floor(Math.random() * 3);
+                    starCount = 2; // Tahap 1 sentiasa 2 pilihan
+                    
+                    if (type === 0) {
+                        // Lebih besar / Lebih kecil
+                        if (Math.random() < 0.5) {
+                            let a = Math.floor(Math.random() * 5) + 1;
+                            correct = a + Math.floor(Math.random() * 3) + 1;
+                            qText = `Nombor yang lebih\nbesar daripada ${a}?`;
+                            wrong1 = Math.max(0, a - 1);
+                        } else {
+                            let a = Math.floor(Math.random() * 5) + 4;
+                            correct = a - (Math.floor(Math.random() * 3) + 1);
+                            qText = `Nombor yang lebih\nkecil daripada ${a}?`;
+                            wrong1 = a + 1;
+                        }
+                    } else if (type === 1) {
+                        // Lengkapkan turutan
+                        let start = Math.floor(Math.random() * 5) + 1;
+                        correct = start + 2;
+                        qText = `Lengkapkan:\n${start}, ${start+1}, _ , ${start+3}`;
+                        wrong1 = correct + 1;
+                    } else {
+                        // Kira objek bertemakan angkasa
+                        const emojis = ['🚀', '⭐', '🪐', '🌎', '🛸'];
+                        const emoji = emojis[Math.floor(Math.random() * emojis.length)];
+                        correct = Math.floor(Math.random() * 5) + 1; // Kira 1 hingga 5
+                        let str = Array(correct).fill(emoji).join(' ');
+                        qText = `Kira bilangan objek:\n${str}`;
+                        wrong1 = correct === 1 ? 2 : correct + (Math.random() < 0.5 ? 1 : -1);
+                    }
+                    
+                } else if (currentLevel === 2) {
+                    // TAHAP 2: Prasekolah - Tahun 1
+                    let type2 = Math.floor(Math.random() * 3);
+                    if (type2 === 0) {
+                        let a = Math.floor(Math.random() * 5) + 1;
+                        let b = Math.floor(Math.random() * 5) + 1;
                         correct = a + b;
                         qText = `${a} + ${b} = ?`;
-                    } else {
-                        let a = Math.floor(Math.random() * 15) + 10;
-                        correct = Math.floor(Math.random() * 12) + 5;
-                        let sum = a + correct;
-                        qText = `${a} + _ = ${sum}`;
-                    }
-                } else if (activeMission === 2) {
-                    // Misi 2: Cabaran Meteor (Tolak lebih mencabar <= 50)
-                    if (Math.random() < 0.5) {
-                        let a = Math.floor(Math.random() * 20) + 20;
-                        let b = Math.floor(Math.random() * 15) + 10;
+                    } else if (type2 === 1) {
+                        let a = Math.floor(Math.random() * 5) + 5;
+                        let b = Math.floor(Math.random() * 4) + 1;
                         correct = a - b;
                         qText = `${a} - ${b} = ?`;
                     } else {
-                        let a = Math.floor(Math.random() * 20) + 20;
-                        correct = Math.floor(Math.random() * 15) + 5;
-                        let diff = a - correct;
-                        qText = `${a} - _ = ${diff}`;
+                        let a = Math.floor(Math.random() * 5) + 1;
+                        correct = Math.floor(Math.random() * 5) + 2;
+                        let sum = a + correct;
+                        qText = `${a} + _ = ${sum}`;
                     }
-                } else {
-                    // Misi 3: Rahsia Planet (Soalan cerita lingkungan 50)
+                    wrong1 = correct + 1; 
+                    wrong2 = Math.max(0, correct - 1);
+
+                } else if (currentLevel === 3) {
+                    // TAHAP 3: Tahun 1 (Penyelesaian Masalah Ringkas)
+                    let a = Math.floor(Math.random() * 10) + 8;
+                    let b = Math.floor(Math.random() * 6) + 2;
                     if (Math.random() < 0.5) {
-                        let a = Math.floor(Math.random() * 15) + 15;
-                        let b = Math.floor(Math.random() * 10) + 5;
                         correct = a + b;
-                        qText = `Ada ${a} planet biru.\nAda ${b} planet merah.\nJumlah planet?`;
+                        qText = `Ali ada ${a} bintang.\nDia dapat ${b} lagi.\nJumlah bintang?`;
                     } else {
-                        let a = Math.floor(Math.random() * 20) + 25;
-                        let b = Math.floor(Math.random() * 10) + 5;
                         correct = a - b;
-                        qText = `Bawa ${a} kotak.\nTurunkan ${b}.\nBaki kotak?`;
+                        qText = `Roket ada ${a} tenaga.\nGuna ${b} tenaga.\nBaki tenaga?`;
                     }
+                    wrong1 = correct + 2; 
+                    wrong2 = Math.max(1, correct - 1);
+                    
+                } else {
+                    // TAHAP 4: Tahun 1 Lanjutan (Pecahan kepada 4 Misi)
+                    let activeMission = currentMission;
+                    if (activeMission === 1) {
+                        // Misi 1: Bintang Bijak
+                        if (Math.random() < 0.5) {
+                            let a = Math.floor(Math.random() * 20) + 10;
+                            let b = Math.floor(Math.random() * 15) + 5;
+                            correct = a + b;
+                            qText = `${a} + ${b} = ?`;
+                        } else {
+                            let a = Math.floor(Math.random() * 15) + 10;
+                            correct = Math.floor(Math.random() * 12) + 5;
+                            let sum = a + correct;
+                            qText = `${a} + _ = ${sum}`;
+                        }
+                    } else if (activeMission === 2) {
+                        // Misi 2: Cabaran Meteor (Tolak lebih mencabar <= 50)
+                        if (Math.random() < 0.5) {
+                            let a = Math.floor(Math.random() * 20) + 20; // 20-39
+                            let b = Math.floor(Math.random() * 10) + 5;  // 5-14 (Kawal b lebih kecil untuk elak jawapan negatif)
+                            correct = a - b;
+                            qText = `${a} - ${b} = ?`;
+                        } else {
+                            let a = Math.floor(Math.random() * 20) + 20;
+                            correct = Math.floor(Math.random() * 15) + 5;
+                            let diff = a - correct;
+                            qText = `${a} - _ = ${diff}`;
+                        }
+                    } else if (activeMission === 3) {
+                        // Misi 3: Rahsia Planet (Soalan cerita lingkungan 50)
+                        if (Math.random() < 0.5) {
+                            let a = Math.floor(Math.random() * 15) + 15;
+                            let b = Math.floor(Math.random() * 10) + 5;
+                            correct = a + b;
+                            qText = `Ada ${a} planet biru.\nAda ${b} planet merah.\nJumlah planet?`;
+                        } else {
+                            let a = Math.floor(Math.random() * 20) + 25; // 25-44
+                            let b = Math.floor(Math.random() * 10) + 5;  // 5-14 (Kawal b lebih kecil untuk elak baki kotak jadi negatif)
+                            correct = a - b;
+                            qText = `Bawa ${a} kotak.\nTurunkan ${b}.\nBaki kotak?`;
+                        }
+                    } else {
+                        // Misi 4: Misi Komander (Campuran)
+                        let type = Math.floor(Math.random() * 3);
+                        if (type === 0) {
+                            let a = Math.floor(Math.random() * 20) + 15;
+                            let b = Math.floor(Math.random() * 10) + 5;
+                            correct = a + b;
+                            qText = `Misi 4:\n${a} + ${b} = ?`;
+                        } else if (type === 1) {
+                            let a = Math.floor(Math.random() * 30) + 20;
+                            let b = Math.floor(Math.random() * 15) + 5;
+                            correct = a - b;
+                            qText = `Misi 4:\n${a} - ${b} = ?`;
+                        } else {
+                            let a = Math.floor(Math.random() * 15) + 15;
+                            correct = Math.floor(Math.random() * 10) + 10;
+                            let sum = a + correct;
+                            qText = `Misi 4:\n${a} + _ = ${sum}`;
+                        }
+                    }
+                    wrong1 = correct + (Math.floor(Math.random() * 4) + 1); 
+                    // Guna Math.max untuk pastikan jawapan salah yang dicipta TIDAK menjadi nombor negatif
+                    wrong2 = Math.max(0, correct - (Math.floor(Math.random() * 4) + 1)); 
                 }
-                wrong1 = correct + (Math.floor(Math.random() * 4) + 1); 
-                wrong2 = correct - (Math.floor(Math.random() * 4) + 1); 
-            }
+            } while (qText === lastQuestionText && attempts++ < 10);
+            
+            lastQuestionText = qText;
 
             // Pastikan pilihan jawapan berbeza (unik) dan tidak bertindih
             let answers = [];
@@ -785,20 +920,34 @@
             document.getElementById('gameover-screen').classList.remove('hidden');
             document.getElementById('final-score').innerText = `${score}/10`;
 
-            let title = "", icon = "", msg = "";
+            let title = "", icon = "", msg = "", badgeId = "";
+            
+            if (currentLevel === 1) { title = "Angkasawan Roket Muda"; icon = "👨‍🚀"; badgeId = "t1"; }
+            else if (currentLevel === 2) { title = "Wira Roket Bijak"; icon = "🛸"; badgeId = "t2"; }
+            else if (currentLevel === 3) { title = "Kapten Roket Angkasa"; icon = "👑"; badgeId = "t3"; }
+            else { 
+                icon = "🚀";
+                if (currentMission === 1) { title = "Misi 1: Bintang Bijak"; icon = "🌟"; badgeId = "t4_1"; }
+                else if (currentMission === 2) { title = "Misi 2: Cabaran Meteor"; icon = "☄️"; badgeId = "t4_2"; }
+                else if (currentMission === 3) { title = "Misi 3: Rahsia Planet"; icon = "🪐"; badgeId = "t4_3"; }
+                else { title = "Misi 4: Komander"; icon = "🚀"; badgeId = "t4_4"; } 
+            }
+
+            // --- Logik penganugerahan Lencana Baru ---
+            let newBadgeEarned = false;
+            // Jika berjaya dapat markah baik (>=7) dan lencana belum dimiliki
+            if (score >= 7 && !userBadges.includes(badgeId)) {
+                userBadges.push(badgeId);
+                localStorage.setItem('MisiAngkasa_Badges', JSON.stringify(userBadges));
+                newBadgeEarned = true;
+            }
+
             if (score === 10) msg = "Sempurna! Semua jawapan tepat.";
             else if (score >= 7) msg = "Bagus! Teruskan usaha anda.";
             else msg = "Pengalaman berharga! Mari berlatih lagi.";
 
-            if (currentLevel === 1) { title = "Angkasawan Roket Muda"; icon = "👨‍🚀"; }
-            else if (currentLevel === 2) { title = "Wira Roket Bijak"; icon = "🛸"; }
-            else if (currentLevel === 3) { title = "Kapten Roket Angkasa"; icon = "👑"; }
-            else { 
-                icon = "🚀";
-                if (currentMission === 1) title = "Misi 1: Bintang Bijak";
-                else if (currentMission === 2) title = "Misi 2: Cabaran Meteor";
-                else if (currentMission === 3) title = "Misi 3: Rahsia Planet";
-                else title = "Misi 4: Komander"; 
+            if (newBadgeEarned) {
+                msg = "Tahniah! Anda telah memenangi Lencana baharu!\n" + msg;
             }
 
             document.getElementById('end-message').innerText = msg;
